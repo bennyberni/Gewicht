@@ -70,9 +70,22 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 function lastBkTxt(){if(!bk.last)return 'noch nie';const d=new Date(bk.last),n=Math.round((new Date(today()+'T12:00:00')-new Date(d.toLocaleDateString('en-CA')+'T12:00:00'))/864e5);return n<=0?'heute':n===1?'gestern':`vor ${n} Tagen (${d.toLocaleDateString('de-DE')})`}
 function bkUi(){$('bkInfo').textContent='Letztes Backup: '+lastBkTxt();$('bkRemind').checked=!!bk.remind}
 function download(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500)}
-function doBackup(){
- download(`gewicht-backup-${today()}.json`,new Blob([JSON.stringify({app:'gewicht',v:1,entries},null,1)],{type:'application/json'}));
- bk.last=Date.now();bkSave();bkUi();toast('Backup wurde heruntergeladen');
+async function saveFile(name,text,mime){
+ const blob=new Blob([text],{type:mime});
+ if(window.showSaveFilePicker){
+  try{const h=await window.showSaveFilePicker({suggestedName:name,types:[{description:'Backup-Datei',accept:{[mime]:['.json']}}]});const w=await h.createWritable();await w.write(blob);await w.close();return 'saved'}
+  catch(e){if(e&&e.name==='AbortError')return 'cancel'}
+ }
+ try{const f=new File([blob],name,{type:mime});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:name});return 'shared'}}
+ catch(e){if(e&&e.name==='AbortError')return 'cancel'}
+ const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+ return 'downloaded';
+}
+const SAVED_MSG={saved:'Backup wurde gespeichert',shared:'Backup wurde weitergegeben',downloaded:'Backup liegt im Download-Ordner'};
+async function doBackup(){
+ const r=await saveFile(`gewicht-backup-${today()}.json`,JSON.stringify({app:'gewicht',v:1,entries},null,1),'application/json');
+ if(r==='cancel')return;
+ bk.last=Date.now();bkSave();bkUi();toast(SAVED_MSG[r]);
 }
 function parseBackup(txt){
  txt=String(txt||'').replace(/^\uFEFF/,'').trim();
