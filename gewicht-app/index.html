@@ -28,7 +28,7 @@ main{max-width:980px;margin:auto;padding:26px 16px 50px}.top{display:flex;justif
 </head>
 <body>
 <main>
-<header class="top"><div><div class="eyebrow">Dein persönlicher Fortschritt</div><h1>Mein Gewicht</h1><p class="sub">Kleine Schritte. Sichtbare Entwicklung.</p></div><div class="pill">♥ Jeden Tag zählt</div></header>
+<header class="top"><div><div class="eyebrow">Dein persönlicher Fortschritt</div><h1>Mein Gewicht</h1><p class="sub">Kleine Schritte. Sichtbare Entwicklung.</p></div></header>
 <section class="grid">
  <div class="card"><div class="metric-label">Letztes Gewicht</div><div class="metric" id="latest">— <span class="unit">kg</span></div></div>
  <div class="card"><div class="metric-label">Veränderung zum Start</div><div class="metric" id="change">—</div></div>
@@ -102,11 +102,11 @@ function restore(){
   const seen={};list.forEach(e=>seen[e.date]=e);entries=Object.values(seen);save();toast(`${entries.length} Einträge geladen`)};r.readAsText(f)};
  inp.click();
 }
-function backupDue(){return bk.remind&&entries.length&&(!bk.last||(bk.changed||0)>bk.last)}
+function backupDue(){return bk.remind&&entries.length>0}
 function checkBackup(){
  if(document.querySelector('.modal')||document.visibilityState==='hidden'||!backupDue())return;
  const m=document.createElement('div');m.className='modal';
- m.innerHTML=`<div class="box" role="dialog" aria-modal="true"><h3>Zeit für ein Backup</h3><p>Seit deinem letzten Backup hast du Daten geändert. Letztes Backup: <b>${esc(lastBkTxt())}</b>.</p><p style="font-size:.88rem">Ohne Backup gehen deine Daten verloren, wenn du die App löschst oder die Browserdaten entfernst.</p><div class="btns"><button class="secondary" data-x="later">Später</button><button data-x="save">Backup speichern</button></div></div>`;
+ m.innerHTML=`<div class="box" role="dialog" aria-modal="true"><h3>Zeit für ein Backup</h3><p>Möchtest du jetzt deine Daten sichern? Letztes Backup: <b>${esc(lastBkTxt())}</b>${bk.last&&(bk.changed||0)<=bk.last?', seitdem keine Änderungen':''}.</p><p style="font-size:.88rem">Ohne Backup gehen deine Daten verloren, wenn du die App löschst oder die Browserdaten entfernst.</p><div class="btns"><button class="secondary" data-x="later">Später</button><button data-x="save">Backup speichern</button></div></div>`;
  m.addEventListener('click',e=>{const x=e.target.dataset.x;if(e.target===m||x==='later')m.remove();if(x==='save'){doBackup();m.remove()}});
  document.body.appendChild(m);
 }
