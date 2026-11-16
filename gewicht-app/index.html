@@ -20,7 +20,10 @@ main{max-width:980px;margin:auto;padding:26px 16px 50px}.top{display:flex;justif
 .chart-wrap{height:220px;margin-top:8px}svg{width:100%;height:100%;overflow:visible}.chart-note{font-size:.82rem;color:var(--muted);margin:8px 0 0}
 .table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:440px}th,td{text-align:left;padding:13px 10px;border-bottom:1px solid var(--line)}th{font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}td{font-size:.94rem}td.weight{font-weight:750}.done{accent-color:var(--green);width:18px;height:18px}.empty{text-align:center;color:var(--muted);padding:26px 10px}.actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}.foot{color:var(--muted);font-size:.8rem;line-height:1.5;margin:16px 3px}
 @media(max-width:650px){main{padding:20px 12px 36px}.grid{grid-template-columns:1fr 1fr}.grid .card:last-child{grid-column:1/-1}.entry{grid-template-columns:1fr 1fr}.entry button{grid-column:1/-1}.top{align-items:flex-start;flex-direction:column}.pill{white-space:normal}}
-@media print{.actions,#entryForm,.checkline{display:none}}
+@media print{.actions,#entryForm,.checkline,.bkrow{display:none}}
+.modal{position:fixed;inset:0;background:#0f172a80;display:flex;align-items:flex-end;justify-content:center;z-index:50;padding:12px}.modal .box{background:#fff;border-radius:22px;padding:22px;max-width:480px;width:100%;box-shadow:0 20px 50px #0004;margin-bottom:env(safe-area-inset-bottom)}.modal h3{margin:0 0 8px;font-size:1.2rem}.modal p{color:var(--muted);margin:0 0 10px;line-height:1.45}.modal .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.bkrow{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line);font-size:.9rem;color:var(--muted)}.bkrow input{width:18px;height:18px;accent-color:var(--green)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#172033;color:#fff;border-radius:12px;padding:11px 15px;font-size:.9rem;z-index:60;max-width:92vw}
 </style>
 </head>
 <body>
@@ -46,16 +49,54 @@ main{max-width:980px;margin:auto;padding:26px 16px 50px}.top{display:flex;justif
 <section class="card">
  <h2 class="section-title">Deine Übersicht</h2>
  <div class="table-wrap"><table><thead><tr><th>Datum</th><th>Gewicht</th><th>Abgehakt</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="4" class="empty">Noch keine Einträge. Trage oben dein erstes Gewicht ein.</td></tr></tbody></table></div>
- <div class="actions"><button class="secondary" id="export">CSV exportieren</button><button class="secondary" id="print">Drucken</button><button class="danger" id="clear">Alle Daten löschen</button></div>
+ <div class="actions"><button id="backup">Backup speichern</button><button class="secondary" id="restore">Backup laden</button><button class="secondary" id="export">CSV exportieren</button><button class="secondary" id="print">Drucken</button><button class="danger" id="clear">Alle Daten löschen</button></div>
+ <div class="bkrow"><span id="bkInfo">Letztes Backup: noch nie</span><label style="display:flex;gap:8px;align-items:center;white-space:nowrap"><input type="checkbox" id="bkRemind"> Erinnerung</label></div>
 </section>
-<p class="foot">Deine Einträge werden lokal in dieser App auf diesem Gerät gespeichert. Beim Löschen der Browserdaten oder bei Deinstallation können sie verloren gehen – exportiere deshalb gelegentlich eine CSV-Sicherung. Die App benötigt keine Anmeldung und keine Internetverbindung.</p>
+<p class="foot">Deine Einträge werden lokal in dieser App auf diesem Gerät gespeichert. Beim Löschen der Browserdaten oder bei Deinstallation können sie verloren gehen – speichere deshalb regelmäßig ein Backup. Mit „Backup laden“ holst du die Daten zurück – auch aus einer älteren CSV-Datei. Die App benötigt keine Anmeldung und keine Internetverbindung.</p>
 </main>
 <script>
 const $=id=>document.getElementById(id), KEY='mein-gewicht-tracker-v1';
 let entries=[]; try{entries=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){entries=[]}
 const today=()=>new Date().toLocaleDateString('en-CA');
 $('date').value=today();
-function save(){try{localStorage.setItem(KEY,JSON.stringify(entries))}catch(e){}render()}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(entries))}catch(e){}bk.changed=Date.now();bkSave();render()}
+/* ---------- Backup & Erinnerung ---------- */
+const BKEY='mein-gewicht-backup-v1';
+let bk={};try{bk=JSON.parse(localStorage.getItem(BKEY)||'{}')||{}}catch(e){bk={}}
+if(bk.remind==null)bk.remind=true;
+function bkSave(){try{localStorage.setItem(BKEY,JSON.stringify(bk))}catch(e){}}
+function toast(m){document.querySelector('.toast')?.remove();const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2800)}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function lastBkTxt(){if(!bk.last)return 'noch nie';const d=new Date(bk.last),n=Math.round((new Date(today()+'T12:00:00')-new Date(d.toLocaleDateString('en-CA')+'T12:00:00'))/864e5);return n<=0?'heute':n===1?'gestern':`vor ${n} Tagen (${d.toLocaleDateString('de-DE')})`}
+function bkUi(){$('bkInfo').textContent='Letztes Backup: '+lastBkTxt();$('bkRemind').checked=!!bk.remind}
+function download(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500)}
+function doBackup(){
+ download(`gewicht-backup-${today()}.json`,new Blob([JSON.stringify({app:'gewicht',v:1,entries},null,1)],{type:'application/json'}));
+ bk.last=Date.now();bkSave();bkUi();toast('Backup wurde heruntergeladen');
+}
+function parseBackup(txt){
+ txt=String(txt||'').replace(/^\uFEFF/,'').trim();
+ if(txt[0]==='{'||txt[0]==='['){const d=JSON.parse(txt);const arr=Array.isArray(d)?d:d.entries;if(!Array.isArray(arr))throw 0;
+  return arr.filter(e=>e&&/^\d{4}-\d{2}-\d{2}$/.test(e.date)&&Number(e.weight)>0).map(e=>({date:e.date,weight:Number(e.weight),done:!!e.done}))}
+ const out=[];txt.split(/\r?\n/).slice(1).forEach(l=>{const [d,w,k]=l.split(';');const n=Number(String(w||'').trim().replace(',','.'));if(/^\d{4}-\d{2}-\d{2}$/.test((d||'').trim())&&n>0)out.push({date:d.trim(),weight:n,done:/^ja$/i.test((k||'').trim())})});
+ return out;
+}
+function restore(){
+ const inp=document.createElement('input');inp.type='file';inp.accept='.json,.csv,application/json,text/csv,text/plain';
+ inp.onchange=()=>{const f=inp.files&&inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{let list;try{list=parseBackup(r.result)}catch(e){list=null}
+  if(!list||!list.length){toast('In der Datei wurden keine Einträge gefunden');return}
+  if(entries.length&&!confirm(`${list.length} Einträge aus „${f.name}“ laden? Die aktuellen Daten in der App werden dabei ersetzt.`))return;
+  const seen={};list.forEach(e=>seen[e.date]=e);entries=Object.values(seen);save();toast(`${entries.length} Einträge geladen`)};r.readAsText(f)};
+ inp.click();
+}
+function backupDue(){return bk.remind&&entries.length&&(!bk.last||(bk.changed||0)>bk.last)}
+function checkBackup(){
+ if(document.querySelector('.modal')||document.visibilityState==='hidden'||!backupDue())return;
+ const m=document.createElement('div');m.className='modal';
+ m.innerHTML=`<div class="box" role="dialog" aria-modal="true"><h3>Zeit für ein Backup</h3><p>Seit deinem letzten Backup hast du Daten geändert. Letztes Backup: <b>${esc(lastBkTxt())}</b>.</p><p style="font-size:.88rem">Ohne Backup gehen deine Daten verloren, wenn du die App löschst oder die Browserdaten entfernst.</p><div class="btns"><button class="secondary" data-x="later">Später</button><button data-x="save">Backup speichern</button></div></div>`;
+ m.addEventListener('click',e=>{const x=e.target.dataset.x;if(e.target===m||x==='later')m.remove();if(x==='save'){doBackup();m.remove()}});
+ document.body.appendChild(m);
+}
 function fmtDate(s){return new Date(s+'T12:00:00').toLocaleDateString('de-DE')}
 function render(){
  entries.sort((a,b)=>a.date.localeCompare(b.date));
@@ -82,7 +123,13 @@ $('date').addEventListener('change',()=>{$('doneToday').checked=!!entries.find(x
 $('export').addEventListener('click',()=>{const csv='Datum;Gewicht_kg;Abgehakt\n'+entries.map(e=>`${e.date};${String(e.weight).replace('.',',')};${e.done?'Ja':'Nein'}`).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='gewichtstagebuch.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)});
 $('print').addEventListener('click',()=>window.print());
 $('clear').addEventListener('click',()=>{if(confirm('Wirklich alle gespeicherten Gewichtsdaten löschen?')){entries=[];save()}});
-render();
+$('backup').addEventListener('click',doBackup);
+$('restore').addEventListener('click',restore);
+$('bkRemind').addEventListener('change',()=>{bk.remind=$('bkRemind').checked;bkSave();toast(bk.remind?'Erinnerung ist an':'Erinnerung ist aus')});
+render();bkUi();
+setTimeout(checkBackup,700);
+let hiddenAt=0;
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){bkUi();if(Date.now()-hiddenAt>60000)setTimeout(checkBackup,500)}else hiddenAt=Date.now()});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 </script>
 </body></html>
