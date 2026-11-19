@@ -24,6 +24,9 @@ main{max-width:980px;margin:auto;padding:26px 16px 50px}.top{display:flex;justif
 .modal{position:fixed;inset:0;background:#0f172a80;display:flex;align-items:flex-end;justify-content:center;z-index:50;padding:12px}.modal .box{background:#fff;border-radius:22px;padding:22px;max-width:480px;width:100%;box-shadow:0 20px 50px #0004;margin-bottom:env(safe-area-inset-bottom)}.modal h3{margin:0 0 8px;font-size:1.2rem}.modal p{color:var(--muted);margin:0 0 10px;line-height:1.45}.modal .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
 .bkrow{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line);font-size:.9rem;color:var(--muted)}.bkrow input{width:18px;height:18px;accent-color:var(--green)}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#172033;color:#fff;border-radius:12px;padding:11px 15px;font-size:.9rem;z-index:60;max-width:92vw}
+.bkbar{position:fixed;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 10px);z-index:45;display:none;align-items:center;gap:8px;max-width:560px;margin:0 auto;background:#fff7ed;color:#9a3412;border:1px solid #fb923c;border-radius:14px;padding:8px 10px 8px 14px;box-shadow:0 8px 24px rgba(0,0,0,.18);font-size:.95rem;line-height:1.3}
+.bkbar.show{display:flex}.bkbar span{flex:1}.bkbar button{border:0;border-radius:10px;font:inherit;font-weight:700;padding:9px 12px;min-height:42px;cursor:pointer}.bkbar .go{background:#ea580c;color:#fff}.bkbar .later{background:none;color:#9a3412;padding:9px 6px}
+@media (prefers-color-scheme:dark){.bkbar{background:#3a2316;color:#fdba74;border-color:#c2410c}.bkbar .later{color:#fdba74}}
 </style>
 </head>
 <body>
@@ -50,16 +53,22 @@ main{max-width:980px;margin:auto;padding:26px 16px 50px}.top{display:flex;justif
  <h2 class="section-title">Deine Übersicht</h2>
  <div class="table-wrap"><table><thead><tr><th>Datum</th><th>Gewicht</th><th>Abgehakt</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="4" class="empty">Noch keine Einträge. Trage oben dein erstes Gewicht ein.</td></tr></tbody></table></div>
  <div class="actions"><button id="backup">Backup speichern</button><button class="secondary" id="restore">Backup laden</button><button class="secondary" id="export">CSV exportieren</button><button class="secondary" id="print">Drucken</button><button class="danger" id="clear">Alle Daten löschen</button></div>
- <div class="bkrow"><span id="bkInfo">Letztes Backup: noch nie</span><label style="display:flex;gap:8px;align-items:center;white-space:nowrap"><input type="checkbox" id="bkRemind"> Erinnerung</label></div>
+ <div class="bkrow"><span id="bkInfo">Letztes Backup: noch nie</span><label style="display:flex;gap:8px;align-items:center;white-space:nowrap"><input type="checkbox" id="bkRemind"> Hinweis nach dem Speichern</label></div>
 </section>
-<p class="foot">Deine Einträge werden lokal in dieser App auf diesem Gerät gespeichert. Beim Löschen der Browserdaten oder bei Deinstallation können sie verloren gehen – speichere deshalb regelmäßig ein Backup. Mit „Backup laden“ holst du die Daten zurück – auch aus einer älteren CSV-Datei. Die App benötigt keine Anmeldung und keine Internetverbindung.</p>
+<p class="foot">Deine Einträge werden lokal in dieser App auf diesem Gerät gespeichert. Beim Löschen der Browserdaten oder bei Deinstallation können sie verloren gehen – speichere deshalb regelmäßig ein Backup. Mit „Backup laden“ holst du die Daten zurück – auch aus einer älteren CSV-Datei. Die App benötigt keine Anmeldung und keine Internetverbindung.</p><p class="foot" style="text-align:center">Version 6</p>
 </main>
 <script>
 const $=id=>document.getElementById(id), KEY='mein-gewicht-tracker-v1';
 let entries=[]; try{entries=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){entries=[]}
 const today=()=>new Date().toLocaleDateString('en-CA');
 $('date').value=today();
-function save(){try{localStorage.setItem(KEY,JSON.stringify(entries))}catch(e){}bk.changed=Date.now();bkSave();render()}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(entries))}catch(e){}bk.changed=Date.now();bk.n=(bk.n||0)+1;bkSave();bkBarShow();render()}
+/* ---------- Backup-Hinweis nach dem Speichern ---------- */
+function bkBarHide(){const b=document.getElementById('bkbar');if(b)b.classList.remove('show')}
+function bkBarShow(){let ok=false;try{ok=bk.remind&&(bk.n||0)>0}catch(e){ok=false}if(!ok||!document.body){bkBarHide();return}
+ let b=document.getElementById('bkbar');
+ if(!b){b=document.createElement('div');b.id='bkbar';b.className='bkbar';b.setAttribute('role','status');b.innerHTML='<span></span><button class="later" type="button">Später</button><button class="go" type="button">Sichern</button>';b.querySelector('.later').onclick=bkBarHide;b.querySelector('.go').onclick=()=>doBackup();document.body.appendChild(b)}
+ b.querySelector('span').textContent=`${bk.n} ${bk.n===1?'Änderung':'Änderungen'} seit dem letzten Backup`;b.classList.add('show')}
 /* ---------- Backup & Erinnerung ---------- */
 const BKEY='mein-gewicht-backup-v1';
 let bk={};try{bk=JSON.parse(localStorage.getItem(BKEY)||'{}')||{}}catch(e){bk={}}
@@ -85,7 +94,7 @@ const SAVED_MSG={saved:'Backup wurde gespeichert',shared:'Backup wurde weitergeg
 async function doBackup(){
  const r=await saveFile(`gewicht-backup-${today()}.json`,JSON.stringify({app:'gewicht',v:1,entries},null,1),'application/json');
  if(r==='cancel')return;
- bk.last=Date.now();bkSave();bkUi();toast(SAVED_MSG[r]);
+ bk.last=Date.now();bk.n=0;bkSave();bkBarHide();bkUi();toast(SAVED_MSG[r]);
 }
 function parseBackup(txt){
  txt=String(txt||'').replace(/^\uFEFF/,'').trim();
@@ -138,11 +147,10 @@ $('print').addEventListener('click',()=>window.print());
 $('clear').addEventListener('click',()=>{if(confirm('Wirklich alle gespeicherten Gewichtsdaten löschen?')){entries=[];save()}});
 $('backup').addEventListener('click',doBackup);
 $('restore').addEventListener('click',restore);
-$('bkRemind').addEventListener('change',()=>{bk.remind=$('bkRemind').checked;bkSave();toast(bk.remind?'Erinnerung ist an':'Erinnerung ist aus')});
+$('bkRemind').addEventListener('change',()=>{bk.remind=$('bkRemind').checked;bkSave();bkBarShow();toast(bk.remind?'Erinnerung ist an':'Erinnerung ist aus')});
 render();bkUi();
-setTimeout(checkBackup,700);
 let hiddenAt=0;
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){bkUi();if(Date.now()-hiddenAt>60000)setTimeout(checkBackup,500)}else hiddenAt=Date.now()});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){bkUi()}else hiddenAt=Date.now()});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 </script>
 </body></html>
